@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>2026 帳本</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+
+body {
+font-family: 'Noto Sans TC', sans-serif;
+background-color: #F5F9FC;
+-webkit-tap-highlight-color: transparent;
+user-select: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+.modal-enter { transform: translateY(100%); transition: transform 0.3s ease-out; }
+.modal-active { transform: translateY(0); }
+
+.swipe-item {
+transition: transform 0.2s ease-out;
+cursor: grab;
+}
+
+.swipe-action-container {
+position: absolute;
+right: 0;
+top: 0;
+bottom: 0;
+display: flex;
+}
+</style>
+</head>
+<body class="pb-24">
+
+<!-- Header -->
+<header class="bg-white border-b sticky top-0 z-20 p-4 flex justify-center items-center shadow-sm">
+<h1 class="text-xl font-bold flex items-center gap-2 text-blue-600">
+<i data-lucide="wallet"></i> 2026 帳本
+</h1>
+</header>
+
+<main id="app" class="max-w-md mx-auto p-4">
+<!-- 消費紀錄頁面 -->
+<div id="record-page">
+<div class="p-6 rounded-3xl shadow-sm border border-blue-100 bg-blue-50">
+<p class="text-[11px] font-bold uppercase tracking-wider text-blue-600">本月累計支出</p>
+<div class="mt-1 flex items-baseline gap-2">
+<h2 id="total-amount" class="text-4xl font-black">$0</h2>
+<span class="text-[10px] font-bold opacity-60 text-blue-800">TWD</span>
+</div>
+<!-- 趨勢對比 -->
+<div id="trend-comparison" class="mt-4 pt-4 border-t border-blue-200 text-xs font-bold flex items-center gap-2">
+<!-- 由 JS 動態生成 -->
+</div>
+</div>
+
+<h3 class="font-bold text-[11px] uppercase tracking-widest text-slate-400 mt-6 px-1">收支明細</h3>
+<div id="expense-list" class="mt-2 space-y-3">
+<!-- 由 JS 動態生成 -->
+</div>
+</div>
+
+<!-- 2026綜合頁面 -->
+<div id="calendar-page" class="hidden space-y-5">
+<!-- 月曆卡片 -->
+<div class="bg-white p-5 rounded-3xl border border-blue-50 shadow-sm">
+<div class="flex justify-between items-center mb-6">
+<button onclick="changeMonth(-1)" class="p-2 text-blue-300"><i data-lucide="chevron-left"></i></button>
+<div class="text-center">
+<h3 id="calendar-title" class="text-lg font-bold text-slate-700">2026 / 1</h3>
+<p class="text-[10px] font-bold text-blue-400">數據分析中心</p>
+</div>
+<button onclick="changeMonth(1)" class="p-2 text-blue-300"><i data-lucide="chevron-right"></i></button>
+</div>
+<div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-300 mb-2">
+<div>SUN</div><div>MON</div><div>TUE</div><div>WED</div><div>THU</div><div>FRI</div><div>SAT</div>
+</div>
+<div id="calendar-grid" class="grid grid-cols-7 gap-1">
+<!-- 由 JS 生成 -->
+</div>
+</div>
+
+<!-- 支出比例 -->
+<div class="bg-white p-5 rounded-3xl border border-blue-50 shadow-sm">
+<h4 class="text-[11px] font-bold text-slate-400 mb-4 flex items-center gap-2 tracking-widest uppercase">
+<i data-lucide="trending-up" class="w-3.5"></i> 支出類別分佈
+</h4>
+<div id="category-bars" class="space-y-4">
+<!-- 由 JS 生成 -->
+</div>
+</div>
+
+<!-- 指定日紀錄 -->
+<div class="bg-white p-5 rounded-3xl border border-blue-50 shadow-sm">
+<h4 id="selected-date-title" class="text-[11px] font-bold text-slate-400 mb-4 flex items-center gap-2 tracking-widest uppercase">
+<i data-lucide="calendar" class="w-3.5"></i> 詳細紀錄
+</h4>
+<div id="daily-detail-list" class="space-y-1">
+<!-- 由 JS 生成 -->
+</div>
+</div>
+</div>
+</main>
+
+<!-- 底部導航 -->
+<nav class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t p-4 flex justify-around max-w-md mx-auto z-30">
+<button onclick="switchTab('record')" id="nav-record" class="flex flex-col items-center gap-1 text-blue-600 transition-all">
+<i data-lucide="list"></i><span class="text-[10px] font-bold">消費紀錄</span>
+</button>
+<button onclick="switchTab('calendar')" id="nav-calendar" class="flex flex-col items-center gap-1 text-slate-300 transition-all">
+<i data-lucide="calendar-days"></i><span class="text-[10px] font-bold">2026綜合</span>
+</button>
+</nav>
+
+<!-- 新增按鈕 -->
+<button onclick="openModal()" class="fixed bottom-24 right-6 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-white z-40 active:scale-95 transition-transform bg-blue-600" style="border: 4px solid white">
+<i data-lucide="plus" class="w-8 h-8"></i>
+</button>
+
+<!-- 新增/編輯 Modal -->
+<div id="modal-overlay" class="fixed inset-0 bg-slate-900/30 z-50 hidden flex items-end justify-center backdrop-blur-sm px-4">
+<div id="modal-content" class="bg-white w-full max-w-md rounded-t-[2.5rem] p-8 shadow-2xl relative translate-y-full transition-transform duration-300">
+<button onclick="closeModal()" class="absolute top-8 right-8 text-slate-300"><i data-lucide="x"></i></button>
+<h2 id="modal-title" class="text-xl font-bold mb-6 text-slate-700">新增交易</h2>
+
+<form id="expense-form" class="space-y-5 max-h-[75vh] overflow-y-auto pb-6 scrollbar-hide">
+<input type="hidden" id="edit-id">
+
+<div>
+<label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">類別</label>
+<div id="category-picker" class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+<!-- 由 JS 生成 -->
+</div>
+<input type="hidden" id="form-category" value="餐飲">
+</div>
+
+<input type="text" id="form-itemName" placeholder="項目名稱" class="w-full bg-slate-50 rounded-xl p-4 text-sm font-bold border border-slate-100 outline-none" required>
+
+<div class="grid grid-cols-2 gap-4">
+<input type="number" id="form-amount" placeholder="金額" class="w-full bg-slate-50 rounded-xl p-4 text-lg font-bold border border-slate-100 outline-none" required>
+<select id="form-currency" class="w-full bg-slate-50 rounded-xl p-4 text-sm font-bold border border-slate-100">
+<option value="TWD">TWD</option>
+<option value="JPY">JPY</option>
+<option value="THB">THB</option>
+<option value="KRW">KRW</option>
+</select>
+</div>
+
+<div class="bg-slate-50 rounded-2xl p-4 space-y-4">
+<div class="flex gap-4">
+<div class="flex-1">
+<label class="text-[10px] font-bold text-slate-400 mb-1 block">支付方式</label>
+<select id="form-paymentMethod" class="w-full bg-transparent text-sm font-bold outline-none">
+<option value="現金">現金</option>
+<option value="信用卡">信用卡</option>
+<option value="Line Pay">Line Pay</option>
+<option value="Apple Pay">Apple Pay</option>
+<option value="其他">其他</option>
+</select>
+</div>
+<div class="flex-1 border-l pl-4">
+<label class="text-[10px] font-bold text-slate-400 mb-1 block">日期</label>
+<input type="date" id="form-date" class="w-full bg-transparent text-sm font-bold outline-none">
+</div>
+</div>
+</div>
+
+<button type="submit" class="w-full text-white bg-blue-600 font-bold py-4 rounded-3xl shadow-lg mt-4 active:scale-95 transition-transform">
+完成紀錄
+</button>
+</form>
+</div>
+</div>
+
+<script>
+// 核心配置
+const CATEGORIES = {
+'餐飲': '#64B5F6', '日用品': '#4DD0E1', '住家': '#FFB74D', '贈禮': '#BA68C8',
+'寵物': '#81C784', '娛樂': '#9575CD', '美妝': '#F06292', '服飾': '#7986CB',
+'交通': '#4FC3F7', '出國': '#4DB6AC', '代墊': '#A1887F'
+};
+
+let expenses = JSON.parse(localStorage.getItem('expenses_2026')) || [];
+let currentActiveTab = 'record';
+let selectedDate = new Date().toISOString().split('T')[0];
+let viewDate = new Date(2026, 0, 1);
+
+// 初始化
+function init() {
+lucide.createIcons();
+renderCategoryPicker();
+renderRecordPage();
+renderCalendar();
+}
+
+// 頁面切換
+function switchTab(tab) {
+currentActiveTab = tab;
+document.getElementById('record-page').classList.toggle('hidden', tab !== 'record');
+document.getElementById('calendar-page').classList.toggle('hidden', tab !== 'calendar');
+
+// UI 狀態切換
+document.getElementById('nav-record').className = `flex flex-col items-center gap-1 transition-all ${tab === 'record' ? 'text-blue-600' : 'text-slate-300'}`;
+document.getElementById('nav-calendar').className = `flex flex-col items-center gap-1 transition-all ${tab === 'calendar' ? 'text-blue-600' : 'text-slate-300'}`;
+
+if(tab === 'calendar') renderCalendar();
+else renderRecordPage();
+}
+
+// 渲染消費紀錄
+function renderRecordPage() {
+const list = document.getElementById('expense-list');
+list.innerHTML = '';
+
+const currentMonthStr = `${viewDate.getFullYear()}-${String(viewDate.getMonth() + 1).padStart(2, '0')}`;
+const lastMonthStr = getYearMonth(viewDate, -1);
+
+const thisMonthData = expenses.filter(e => e.date.startsWith(currentMonthStr) && e.category !== '代墊');
+const lastMonthData = expenses.filter(e => e.date.startsWith(lastMonthStr) && e.category !== '代墊');
+
+const total = thisMonthData.reduce((s, e) => s + e.amount, 0);
+const lastTotal = lastMonthData.reduce((s, e) => s + e.amount, 0);
+
+document.getElementById('total-amount').innerText = `$${total.toLocaleString()}`;
+
+// 趨勢
+const trendEl = document.getElementById('trend-comparison');
+const diff = total - lastTotal;
+if (lastTotal === 0) {
+trendEl.innerHTML = `<span class="text-blue-400">上月無數據比較</span>`;
+} else {
+const percent = ((diff / lastTotal) * 100).toFixed(1);
+if (diff > 0) {
+trendEl.innerHTML = `<i data-lucide="arrow-up-right" class="w-4 text-red-400"></i> <span class="text-red-400">較上月增加 $${diff.toLocaleString()} (${percent}%)</span>`;
+} else if (diff < 0) {
+trendEl.innerHTML = `<i data-lucide="arrow-down-right" class="w-4 text-green-500"></i> <span class="text-green-500">較上月減少 $${Math.abs(diff).toLocaleString()} (${Math.abs(percent)}%)</span>`;
+} else {
+trendEl.innerHTML = `<span class="text-blue-400">支出與上月持平</span>`;
+}
+}
+
+// 列表
+if (expenses.length === 0) {
+list.innerHTML = `<div class="text-center py-20 text-slate-300 text-sm">無消費紀錄</div>`;
+} else {
+// 按日期排序 (最新在前)
+const sorted = [...expenses].sort((a,b) => b.date.localeCompare(a.date));
+sorted.forEach(exp => {
+const item = document.createElement('div');
+item.className = "bg-white p-4 rounded-2xl flex justify-between items-center shadow-sm border border-slate-50";
+item.innerHTML = `
+<div class="flex items-center gap-3">
+<div class="w-1 h-8 rounded-full" style="background-color: ${CATEGORIES[exp.category]}"></div>
+<div>
+<div class="flex items-center gap-2">
+<span class="text-[9px] font-bold px-1.5 py-0.5 rounded" style="background-color: ${CATEGORIES[exp.category]}15; color: ${CATEGORIES[exp.category]}">${exp.category}</span>
+<span class="text-[9px] text-slate-400">${exp.date}</span>
+</div>
+<p class="font-bold text-sm text-slate-700">${exp.itemName}</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-bold ${exp.category === '代墊' ? 'text-blue-400' : 'text-slate-800'}">$${exp.amount.toLocaleString()}</p>
+<button onclick="deleteItem(${exp.id})" class="text-[9px] text-red-300 font-bold">刪除</button>
+</div>
+`;
+list.appendChild(item);
+});
+}
+lucide.createIcons();
+}
+
+// 渲染月曆
+function renderCalendar() {
+const grid = document.getElementById('calendar-grid');
+grid.innerHTML = '';
+
+const year = viewDate.getFullYear();
+const month = viewDate.getMonth();
+document.getElementById('calendar-title').innerText = `${year} / ${month + 1}`;
+
+const firstDay = new Date(year, month, 1).getDay();
+const daysInMonth = new Date(year, month + 1, 0).getDate();
+const currentMonthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+// 填充空格
+for (let i = 0; i < firstDay; i++) {
+grid.innerHTML += `<div></div>`;
+}
+
+for (let i = 1; i <= daysInMonth; i++) {
+const dStr = `${currentMonthStr}-${String(i).padStart(2, '0')}`;
+const isSelected = selectedDate === dStr;
+const dailySum = expenses
+.filter(e => e.date === dStr && e.category !== '代墊')
+.reduce((s, e) => s + e.amount, 0);
+
+const btn = document.createElement('button');
+btn.onclick = () => selectDay(dStr);
+btn.className = `h-12 rounded-xl flex flex-col items-center justify-center transition-all ${isSelected ? 'bg-blue-600 text-white shadow-md scale-105' : 'bg-slate-50 text-slate-700'}`;
+btn.innerHTML = `
+<span class="text-[11px] font-bold">${i}</span>
+${dailySum > 0 ? `<span class="text-[7px] font-black ${isSelected ? 'text-blue-100' : 'text-blue-500'}">$${dailySum >= 1000 ? (dailySum/1000).toFixed(0)+'k' : dailySum}</span>` : ''}
+`;
+grid.appendChild(btn);
+}
+
+renderDailyDetails();
+renderCategoryAnalysis();
+}
+
+function renderDailyDetails() {
+const list = document.getElementById('daily-detail-list');
+document.getElementById('selected-date-title').innerText = `${selectedDate} 詳細紀錄`;
+list.innerHTML = '';
+
+const records = expenses.filter(e => e.date === selectedDate);
+if (records.length === 0) {
+list.innerHTML = `<p class="text-center py-4 text-[10px] text-slate-300">本日無紀錄</p>`;
+} else {
+records.forEach(r => {
+list.innerHTML += `
+<div class="flex justify-between items-center p-3 bg-slate-50 rounded-xl mb-1">
+<div class="flex items-center gap-2">
+<div class="w-1 h-4 rounded-full" style="background-color: ${CATEGORIES[r.category]}"></div>
+<span class="text-xs font-bold text-slate-700">${r.itemName}</span>
+</div>
+<span class="text-xs font-bold ${r.category === '代墊' ? 'text-blue-400' : 'text-slate-800'}">$${r.amount.toLocaleString()}</span>
+</div>
+`;
+});
+}
+}
+
+function renderCategoryAnalysis() {
+const container = document.getElementById('category-bars');
+container.innerHTML = '';
+
+const currentMonthStr = `${viewDate.getFullYear()}-${String(viewDate.getMonth() + 1).padStart(2, '0')}`;
+const monthData = expenses.filter(e => e.date.startsWith(currentMonthStr) && e.category !== '代墊');
+const total = monthData.reduce((s, e) => s + e.amount, 0);
+
+if (total === 0) {
+container.innerHTML = `<p class="text-center py-4 text-[10px] text-slate-300">本月無消費資料</p>`;
+return;
+}
+
+const catMap = {};
+monthData.forEach(e => { catMap[e.category] = (catMap[e.category] || 0) + e.amount; });
+
+Object.entries(catMap)
+.sort((a,b) => b[1] - a[1])
+.forEach(([name, val]) => {
+const percent = ((val / total) * 100).toFixed(0);
+container.innerHTML += `
+<div class="space-y-1">
+<div class="flex justify-between items-center text-[10px] font-bold">
+<span class="text-slate-600">${name}</span>
+<span class="text-slate-400">$${val.toLocaleString()} (${percent}%)</span>
+</div>
+<div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+<div class="h-full bg-blue-500 rounded-full" style="width: ${percent}%; background-color: ${CATEGORIES[name]}"></div>
+</div>
+</div>
+`;
+});
+}
+
+// 功能性函數
+function getYearMonth(date, offset) {
+const d = new Date(date.getFullYear(), date.getMonth() + offset, 1);
+return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function changeMonth(dir) {
+viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + dir, 1);
+renderCalendar();
+}
+
+function selectDay(dStr) {
+selectedDate = dStr;
+renderCalendar();
+}
+
+function deleteItem(id) {
+expenses = expenses.filter(e => e.id !== id);
+saveData();
+if (currentActiveTab === 'record') renderRecordPage();
+else renderCalendar();
+}
+
+function saveData() {
+localStorage.setItem('expenses_2026', JSON.stringify(expenses));
+}
+
+// Modal 控制
+function openModal() {
+document.getElementById('modal-overlay').classList.remove('hidden');
+setTimeout(() => {
+document.getElementById('modal-content').classList.remove('translate-y-full');
+}, 10);
+
+// 智慧日期連動
+const dateInput = document.getElementById('form-date');
+if (currentActiveTab === 'calendar') {
+dateInput.value = selectedDate;
+} else {
+dateInput.value = new Date().toISOString().split('T')[0];
+}
+
+document.getElementById('expense-form').reset();
+document.getElementById('edit-id').value = '';
+document.getElementById('modal-title').innerText = "新增交易";
+setFormCategory('餐飲');
+}
+
+function closeModal() {
+document.getElementById('modal-content').classList.add('translate-y-full');
+setTimeout(() => {
+document.getElementById('modal-overlay').classList.add('hidden');
+}, 300);
+}
+
+function renderCategoryPicker() {
+const picker = document.getElementById('category-picker');
+picker.innerHTML = '';
+Object.keys(CATEGORIES).forEach(c => {
+const btn = document.createElement('button');
+btn.type = "button";
+btn.id = `cat-btn-${c}`;
+btn.onclick = () => setFormCategory(c);
+btn.className = "px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all";
+btn.style.backgroundColor = '#F1F5F9';
+btn.style.color = CATEGORIES[c];
+btn.innerText = c;
+picker.appendChild(btn);
+});
+}
+
+function setFormCategory(c) {
+document.getElementById('form-category').value = c;
+Object.keys(CATEGORIES).forEach(cat => {
+const btn = document.getElementById(`cat-btn-${cat}`);
+if (cat === c) {
+btn.style.backgroundColor = CATEGORIES[cat];
+btn.style.color = 'white';
+} else {
+btn.style.backgroundColor = '#F1F5F9';
+btn.style.color = CATEGORIES[cat];
+}
+});
+}
+
+// 表單提交
+document.getElementById('expense-form').onsubmit = (e) => {
+e.preventDefault();
+const newItem = {
+id: Date.now(),
+date: document.getElementById('form-date').value,
+category: document.getElementById('form-category').value,
+itemName: document.getElementById('form-itemName').value,
+amount: parseFloat(document.getElementById('form-amount').value),
+currency: document.getElementById('form-currency').value,
+paymentMethod: document.getElementById('form-paymentMethod').value,
+isPaidBack: false
+};
+
+expenses.unshift(newItem);
+saveData();
+closeModal();
+
+if (currentActiveTab === 'record') renderRecordPage();
+else renderCalendar();
+};
+
+window.onload = init;
+</script>
+</body>
+</html>
